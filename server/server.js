@@ -98,11 +98,11 @@ app.patch('/todos/:id', (req, res) => {
         body.completedAt = '';
     }
 
-    Todo.findByIdAndUpdate(id, { $set: body }, { new: true }).then((data) => {
-        if (!data) {
+    Todo.findOneAndUpdate(id, { $set: body }, { new: true }).then((todos) => {
+        if (!todos) {
             res.send(400).send('Document can not be updated');
         } else {
-            res.send({data});
+            res.send({todos});
         }
 
     }).catch((e) => {
