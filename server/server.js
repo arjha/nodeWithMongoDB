@@ -1,18 +1,20 @@
+const _ = require('lodash');
 const express = require('express');
 const bodyParser = require('body-parser');
 const { ObjectID } = require('mongodb');
 
-var { mongoose } = require('./db/mongoose')
-var { Todo } = require('./models/todo');
-var { User } = require('./models/user');
+const { mongoose } = require('./db/mongoose')
+const { Todo } = require('./models/todo');
+const { User } = require('./models/user');
 
-var app = express();
-var port=process.env.PORT||3000;
+const app = express();
+const port = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
+//POST todos
 app.post('/todos', (req, res) => {
-    var todo = new Todo({
+    let todo = new Todo({
         text: req.body.text
     })
     todo.save().then((doc) => {
@@ -21,6 +23,8 @@ app.post('/todos', (req, res) => {
         res.status(400).send(e);
     });
 });
+
+//GET todos
 app.get('/todos', (req, res) => {
     Todo.find().then((todos) => {
         res.send({ todos });
@@ -28,6 +32,8 @@ app.get('/todos', (req, res) => {
         res.status(400).send(e);
     });
 });
+
+//POST users
 app.post('/users', (req, res) => {
     var user = new User({
         email: req.body.email
@@ -52,17 +58,17 @@ app.get('/todos/:id', (req, res) => {
             if (!todos) {
                 res.status(404).send('Invalid id');
             } else {
-                res.send({todos});
+                res.send({ todos });
             }
 
         }).catch((e) => res.status(400).send('Some error occoured'));
     }
 });
 
-//Delete
+//Delete /todos/:Id
 
-app.delete('/todos/:id',(req,res)=>{
-    let id=req.params.id;
+app.delete('/todos/:id', (req, res) => {
+    let id = req.params.id;
     if (!ObjectID.isValid(id)) {
         res.status(404).send('Id not found in collection');
     } else {
@@ -70,11 +76,39 @@ app.delete('/todos/:id',(req,res)=>{
             if (!todos) {
                 res.status(404).send('Invalid id');
             } else {
-                res.send({todos});
+                res.send({ todos });
             }
 
         }).catch((e) => res.status(400).send('Some error occoured'));
     }
+});
+
+//Patch /todos/:Id
+
+app.patch('/todos/:id', (req, res) => {
+    let id = req.params.id;
+    let body = _.pick(req.body, ['text', 'completed']);
+    if (!ObjectID.isValid(id)) {
+        res.status(404).send('Id not found in collection');
+    }
+    if (_.isBoolean(body.completed) && body.completed) {
+        body.completedAt = +new Date();
+    } else {
+        body.completed = false;
+        body.completedAt = '';
+    }
+
+    Todo.findByIdAndUpdate(id, { $set: body }, { new: true }).then((data) => {
+        if (!data) {
+            res.send(400).send('Document can not be updated');
+        } else {
+            res.send({data});
+        }
+
+    }).catch((e) => {
+        res.send(500).send(e)
+    }
+    );
 });
 
 app.listen(port, () => {
