@@ -1,5 +1,8 @@
 const _ = require('lodash');
 const express = require('express');
+const spdy = require('spdy');
+const path = require('path')
+const fs = require('fs')
 const bodyParser = require('body-parser');
 const { ObjectID } = require('mongodb');
 
@@ -8,7 +11,17 @@ const { mongoose } = require('./db/mongoose')
 const { Todo } = require('./models/todo');
 const { User } = require('./models/user');
 
+const options = {
+    key: fs.readFileSync(__dirname + '/server.key'),
+    cert: fs.readFileSync(__dirname + '/server.crt')
+}
+
 const app = express();
+app.use(function (req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
+});
 const port = process.env.PORT;
 
 app.use(bodyParser.json());
@@ -36,12 +49,13 @@ app.get('/todos', (req, res) => {
 
 //POST users
 app.post('/users', (req, res) => {
-    var user = new User({
-        email: req.body.email
-    })
-    user.save().then((doc) => {
-        res.send(doc)
-    }, (e) => {
+    let body = _.pick(req.body, ['email', 'password']);
+    var user = new User(body);
+    user.save().then(() => {
+        return user.generateAuthToken();
+    }).then((token) => {
+        res.header('x-auth',token).send(user);
+    }).catch((e) => {
         res.status(400).send(e);
     });
 });
@@ -112,9 +126,16 @@ app.patch('/todos/:id', (req, res) => {
     );
 });
 
-app.listen(port, () => {
-    console.log(`app is started at port ${port}`);
-});
+spdy
+    .createServer(options, app)
+    .listen(port, (error) => {
+        if (error) {
+            console.error(error)
+            return process.exit(1)
+        } else {
+            console.log(`app is started at port ${port}`);
+        }
+    });
 
 
 module.exports = { app };
